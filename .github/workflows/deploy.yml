@@ -40,9 +40,20 @@ jobs:
       - name: Set up Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Create app if it doesn't exist
+        run: |
+          if ! flyctl status --app alerts-api 2>/dev/null; then
+            echo "Creating app..."
+            flyctl apps create alerts-api
+          else
+            echo "App already exists"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Set Fly.io secrets
         run: |
-          flyctl secrets set --stage \
+          flyctl secrets set \
             TOKEN="${{ secrets.TOKEN }}" \
             TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
             TWILIO_API_KEY_SID="${{ secrets.TWILIO_API_KEY_SID }}" \
