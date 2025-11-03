@@ -15,7 +15,7 @@ A simple Go service that triggers phone calls via Twilio when a webhook is hit. 
 
 ## Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - Twilio account with:
   - Account SID
   - API Key and Secret (create at https://console.twilio.com/us1/develop/runtime/api-keys)
