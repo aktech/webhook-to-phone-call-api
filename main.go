@@ -20,6 +20,31 @@ func main() {
 		slog.Error("TOKEN environment variable is required")
 		os.Exit(1)
 	}
+
+	// Log configured phone numbers (masked for privacy)
+	fromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+	toNumbers := os.Getenv("ALERT_TO_NUMBER")
+	if fromNumber != "" {
+		maskedFrom := fromNumber
+		if len(fromNumber) >= 7 {
+			maskedFrom = fromNumber[:7] + "****"
+		}
+		slog.Info("configured caller id", "from", maskedFrom)
+	}
+	if toNumbers != "" {
+		numbers := strings.Split(toNumbers, ",")
+		var maskedNumbers []string
+		for _, num := range numbers {
+			num = strings.TrimSpace(num)
+			if len(num) >= 7 {
+				maskedNumbers = append(maskedNumbers, num[:7]+"****")
+			} else {
+				maskedNumbers = append(maskedNumbers, num)
+			}
+		}
+		slog.Info("configured alert recipients", "count", len(numbers), "numbers", strings.Join(maskedNumbers, ", "))
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/alert/", alertHandler(token))
 	mux.HandleFunc("/health", healthHandler)
