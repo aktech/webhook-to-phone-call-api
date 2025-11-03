@@ -64,7 +64,6 @@ func triggerTwilioCall(r *http.Request) error {
 	data.Set("From", fromNumber)
 	data.Set("Twiml", `<Response><Say voice="alice">Alert triggered</Say></Response>`)
 	apiURL := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", accountSid)
-	slog.Info("calling twilio API", "url", apiURL, "params", data.Encode())
 	req, err := http.NewRequest("POST", apiURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
@@ -77,11 +76,10 @@ func triggerTwilioCall(r *http.Request) error {
 		return err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("twilio API error: %d - %s", resp.StatusCode, string(body))
 	}
-	slog.Info("twilio call queued", "status", resp.StatusCode, "response", string(body))
 	return nil
 }
 

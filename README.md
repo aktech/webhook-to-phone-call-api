@@ -1,5 +1,7 @@
 # Alerts API
 
+[![Deploy to Fly.io](https://github.com/aktech/alerts-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/aktech/alerts-api/actions/workflows/deploy.yml)
+
 A simple Go service that triggers phone calls via Twilio when a webhook is hit. Uses Twilio's latest API key authentication for production security.
 
 ## Features
@@ -68,31 +70,68 @@ curl http://localhost:8080/alert/your-secret-token
 # For local testing, use ngrok: ngrok http 8080
 ```
 
-### 3. Deploy to Fly.io
+### 3. Deploy to Fly.io (Automated via GitHub Actions)
+
+This project uses GitHub Actions for automated deployment to Fly.io. Deployment happens automatically on push to `main`.
+
+#### Initial Setup (One-time):
+
+1. **Create Fly.io app and get API token:**
+   ```bash
+   # Login to Fly.io
+   fly auth login
+
+   # Create the app (run from project root)
+   fly apps create alerts-api
+
+   # Get your Fly.io API token
+   fly auth token
+   ```
+
+2. **Set GitHub Secrets:**
+
+   Go to your GitHub repository → Settings → Secrets and variables → Actions, and add:
+
+   - `FLY_API_TOKEN` - Your Fly.io API token from step 1
+
+3. **Set Fly.io secrets:**
+   ```bash
+   fly secrets set TOKEN=your-secret-token-here \
+     TWILIO_ACCOUNT_SID=ACxxxxx \
+     TWILIO_API_KEY_SID=SKxxxxx \
+     TWILIO_API_KEY_SECRET=your-api-key-secret \
+     TWILIO_FROM_NUMBER=+1234567890 \
+     ALERT_TO_NUMBER=+1234567890
+   ```
+
+#### Deployment:
+
+After initial setup, deployment is fully automated:
+
+- **Push to main** → Automatically builds, tests, and deploys to Fly.io
+- **Pull requests** → Automatically runs tests (no deployment)
+
+Check deployment status in the **Actions** tab of your GitHub repository.
+
+#### Manual Deployment (Optional):
+
+If you need to deploy manually:
 
 ```bash
-# Login to Fly.io
-fly auth login
-
-# Launch the app (follow prompts)
-fly launch
-
-# Set environment variables (secrets)
-fly secrets set TOKEN=your-secret-token-here
-fly secrets set TWILIO_ACCOUNT_SID=ACxxxxx
-fly secrets set TWILIO_API_KEY_SID=SKxxxxx
-fly secrets set TWILIO_API_KEY_SECRET=your-api-key-secret
-fly secrets set TWILIO_FROM_NUMBER=+1234567890
-fly secrets set ALERT_TO_NUMBER=+1234567890
-
-# Deploy
 fly deploy
+```
 
-# Check status
+#### Monitoring:
+
+```bash
+# Check app status
 fly status
 
 # View logs
 fly logs
+
+# Open app in browser
+fly open
 ```
 
 ## Environment Variables
