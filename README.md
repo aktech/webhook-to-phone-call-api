@@ -6,7 +6,8 @@ A simple Go service that triggers phone calls via Twilio when a webhook is hit. 
 
 ## Features
 
-- POST `/alert/:token` - Triggers a phone call via Twilio (requires matching token)
+- GET/POST `/alert/:token` - Triggers phone calls via Twilio (requires matching token)
+- **Multiple phone numbers** - Call multiple numbers simultaneously (comma-separated)
 - GET `/health` - Health check endpoint
 - GET `/twiml` - Returns TwiML XML for the alert message
 - Uses Twilio API keys (recommended for production)
@@ -139,7 +140,7 @@ fly open
 | `TWILIO_API_KEY_SID` | Your Twilio API Key SID (starts with SK) | Yes |
 | `TWILIO_API_KEY_SECRET` | Your Twilio API Key Secret | Yes |
 | `TWILIO_FROM_NUMBER` | Your Twilio phone number (E.164 format) | Yes |
-| `ALERT_TO_NUMBER` | Phone number to call when alert triggered | Yes |
+| `ALERT_TO_NUMBER` | Phone number(s) to call when alert triggered (comma-separated for multiple: `+1234567890,+0987654321`) | Yes |
 | `PORT` | Port to run the service on (default: 8080) | No |
 
 ## Usage
@@ -154,7 +155,9 @@ curl https://your-app.fly.dev/alert/your-secret-token
 curl -X POST https://your-app.fly.dev/alert/your-secret-token
 ```
 
-This will immediately trigger a phone call to `ALERT_TO_NUMBER` with the message "Alert triggered".
+This will immediately trigger phone calls to all numbers in `ALERT_TO_NUMBER` with the message "Alert triggered".
+
+**Multiple numbers:** Set `ALERT_TO_NUMBER=+1234567890,+0987654321` to call multiple numbers simultaneously. The service will attempt to call all numbers and log any failures.
 
 ## Cost Optimization
 

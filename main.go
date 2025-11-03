@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 func main() {
@@ -18,18 +20,62 @@ func main() {
 		slog.Error("TOKEN environment variable is required")
 		os.Exit(1)
 	}
-	http.HandleFunc("/alert/", alertHandler(token))
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/twiml", twimlHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/alert/", alertHandler(token))
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/twiml", twimlHandler)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	slog.Info("starting server", "port", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, loggingMiddleware(mux)); err != nil {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	size, err := rw.ResponseWriter.Write(b)
+	rw.size += size
+	return size, err
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &responseWriter{ResponseWriter: w, status: 200}
+		requestID := r.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = r.Header.Get("Fly-Request-Id")
+		}
+		next.ServeHTTP(rw, r)
+		duration := time.Since(start)
+		slog.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration_ms", duration.Milliseconds(),
+			"size_bytes", rw.size,
+			"remote_ip", r.RemoteAddr,
+			"user_agent", r.UserAgent(),
+			"referer", r.Referer(),
+			"request_id", requestID,
+			"proto", r.Proto,
+			"host", r.Host,
+		)
+	})
 }
 
 func alertHandler(expectedToken string) http.HandlerFunc {
@@ -38,27 +84,64 @@ func alertHandler(expectedToken string) http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if strings.TrimPrefix(r.URL.Path, "/alert/") != expectedToken {
-			slog.Warn("unauthorized alert attempt", "ip", r.RemoteAddr)
+		token := strings.TrimPrefix(r.URL.Path, "/alert/")
+		if token != expectedToken {
+			slog.Warn("unauthorized alert attempt", "provided_token_length", len(token))
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		if err := triggerTwilioCall(r); err != nil {
-			slog.Error("failed to trigger call", "error", err)
+			slog.Error("twilio call failed", "error", err)
 			http.Error(w, "Failed to trigger call", http.StatusInternalServerError)
 			return
 		}
-		slog.Info("alert triggered", "ip", r.RemoteAddr)
 		fmt.Fprintln(w, "Alert triggered successfully")
 	}
 }
 
 func triggerTwilioCall(r *http.Request) error {
 	accountSid, apiKeySid, apiKeySecret := os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_API_KEY_SID"), os.Getenv("TWILIO_API_KEY_SECRET")
-	fromNumber, toNumber := os.Getenv("TWILIO_FROM_NUMBER"), os.Getenv("ALERT_TO_NUMBER")
-	if accountSid == "" || apiKeySid == "" || apiKeySecret == "" || fromNumber == "" || toNumber == "" {
+	fromNumber, toNumbers := os.Getenv("TWILIO_FROM_NUMBER"), os.Getenv("ALERT_TO_NUMBER")
+	if accountSid == "" || apiKeySid == "" || apiKeySecret == "" || fromNumber == "" || toNumbers == "" {
 		return fmt.Errorf("missing Twilio environment variables")
 	}
+	numbers := strings.Split(toNumbers, ",")
+	slog.Info("initiating calls", "count", len(numbers), "from", fromNumber)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errs []string
+	successCount := 0
+
+	for _, toNumber := range numbers {
+		toNumber = strings.TrimSpace(toNumber)
+		wg.Add(1)
+		go func(num string) {
+			defer wg.Done()
+			if err := makeCall(accountSid, apiKeySid, apiKeySecret, fromNumber, num); err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Sprintf("%s: %v", num, err))
+				mu.Unlock()
+				slog.Error("call failed", "to", num, "error", err)
+			} else {
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+				slog.Info("call queued", "to", num, "from", fromNumber)
+			}
+		}(toNumber)
+	}
+
+	wg.Wait()
+
+	slog.Info("call batch complete", "success", successCount, "failed", len(errs), "total", len(numbers))
+	if len(errs) > 0 {
+		return fmt.Errorf("failed calls: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func makeCall(accountSid, apiKeySid, apiKeySecret, fromNumber, toNumber string) error {
 	data := url.Values{}
 	data.Set("To", toNumber)
 	data.Set("From", fromNumber)
