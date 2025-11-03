@@ -1,0 +1,21 @@
+# Environment variables
+.env
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Fly.io
+.fly/
+
+alerts-api
