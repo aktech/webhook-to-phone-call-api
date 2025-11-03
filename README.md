@@ -70,56 +70,52 @@ curl http://localhost:8080/alert/your-secret-token
 # For local testing, use ngrok: ngrok http 8080
 ```
 
-### 3. Deploy to Fly.io (Automated via GitHub Actions)
+### 3. Deploy to Fly.io (Fully Automated via GitHub Actions)
 
-This project uses GitHub Actions for automated deployment to Fly.io. Deployment happens automatically on push to `main`.
+This project uses GitHub Actions for **100% automated deployment** to Fly.io. Everything is automated - no manual commands needed!
 
 #### Initial Setup (One-time):
 
-1. **Create Fly.io app and get API token:**
+1. **Create Fly.io app:**
    ```bash
-   # Login to Fly.io
    fly auth login
-
-   # Create the app (run from project root)
    fly apps create alerts-api
-
-   # Get your Fly.io API token
-   fly auth token
+   fly auth token  # Copy this token
    ```
 
 2. **Set GitHub Secrets:**
 
-   Go to your GitHub repository → Settings → Secrets and variables → Actions, and add:
+   Go to your GitHub repository → Settings → Secrets and variables → Actions, and add these secrets:
 
-   - `FLY_API_TOKEN` - Your Fly.io API token from step 1
+   | Secret Name | Value |
+   |-------------|-------|
+   | `FLY_API_TOKEN` | Your Fly.io API token (from step 1) |
+   | `TOKEN` | Your webhook authentication token |
+   | `TWILIO_ACCOUNT_SID` | Your Twilio Account SID |
+   | `TWILIO_API_KEY_SID` | Your Twilio API Key SID |
+   | `TWILIO_API_KEY_SECRET` | Your Twilio API Key Secret |
+   | `TWILIO_FROM_NUMBER` | Your Twilio phone number |
+   | `ALERT_TO_NUMBER` | Phone number to call for alerts |
 
-3. **Set Fly.io secrets:**
+3. **Deploy:**
    ```bash
-   fly secrets set TOKEN=your-secret-token-here \
-     TWILIO_ACCOUNT_SID=ACxxxxx \
-     TWILIO_API_KEY_SID=SKxxxxx \
-     TWILIO_API_KEY_SECRET=your-api-key-secret \
-     TWILIO_FROM_NUMBER=+1234567890 \
-     ALERT_TO_NUMBER=+1234567890
+   git add .
+   git commit -m "Initial commit"
+   git push origin main
    ```
 
-#### Deployment:
+**That's it!** GitHub Actions will automatically:
+- Set all secrets on Fly.io
+- Build and test your app
+- Deploy to Fly.io
 
-After initial setup, deployment is fully automated:
+#### Automated Deployment:
 
-- **Push to main** → Automatically builds, tests, and deploys to Fly.io
+- **Push to main** → Automatically sets secrets, builds, tests, and deploys
 - **Pull requests** → Automatically runs tests (no deployment)
+- **Secrets management** → Automatically synced from GitHub Secrets to Fly.io
 
 Check deployment status in the **Actions** tab of your GitHub repository.
-
-#### Manual Deployment (Optional):
-
-If you need to deploy manually:
-
-```bash
-fly deploy
-```
 
 #### Monitoring:
 

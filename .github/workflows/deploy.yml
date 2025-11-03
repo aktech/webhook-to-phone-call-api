@@ -40,6 +40,18 @@ jobs:
       - name: Set up Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Set Fly.io secrets
+        run: |
+          flyctl secrets set --stage \
+            TOKEN="${{ secrets.TOKEN }}" \
+            TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
+            TWILIO_API_KEY_SID="${{ secrets.TWILIO_API_KEY_SID }}" \
+            TWILIO_API_KEY_SECRET="${{ secrets.TWILIO_API_KEY_SECRET }}" \
+            TWILIO_FROM_NUMBER="${{ secrets.TWILIO_FROM_NUMBER }}" \
+            ALERT_TO_NUMBER="${{ secrets.ALERT_TO_NUMBER }}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
         env:
