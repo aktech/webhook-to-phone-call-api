@@ -1,8 +1,9 @@
 # Alerts API
 
+[![CI](https://github.com/aktech/alerts-api/actions/workflows/ci.yml/badge.svg)](https://github.com/aktech/alerts-api/actions/workflows/ci.yml)
 [![Deploy to Fly.io](https://github.com/aktech/alerts-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/aktech/alerts-api/actions/workflows/deploy.yml)
 
-A simple Go service that triggers phone calls via Twilio when a webhook is hit. Uses Twilio's latest API key authentication for production security.
+A simple Go service that triggers phone calls via Twilio when a webhook is hit. Uses Twilio's latest API key authentication.
 
 ## Features
 

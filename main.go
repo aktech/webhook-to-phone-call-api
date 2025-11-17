@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// main initializes the HTTP server with structured logging and configures routes for
+// alert triggering, health checks, and TwiML responses. It validates required environment
+// variables and masks sensitive phone numbers in logs before starting the server.
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	token := os.Getenv("TOKEN")
@@ -60,23 +63,29 @@ func main() {
 	}
 }
 
+// responseWriter wraps http.ResponseWriter to capture response status and size
+// for structured logging in the logging middleware.
 type responseWriter struct {
 	http.ResponseWriter
 	status int
 	size   int
 }
 
+// WriteHeader captures the HTTP status code and delegates to the underlying ResponseWriter.
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+// Write captures the number of bytes written and delegates to the underlying ResponseWriter.
 func (rw *responseWriter) Write(b []byte) (int, error) {
 	size, err := rw.ResponseWriter.Write(b)
 	rw.size += size
 	return size, err
 }
 
+// loggingMiddleware wraps HTTP handlers to log request details including method, path,
+// status code, duration, response size, client IP, user agent, and request ID.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -103,6 +112,8 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// alertHandler creates an HTTP handler that validates the token in the URL path and triggers
+// phone calls via Twilio. Accepts both GET and POST requests to /alert/{token}.
 func alertHandler(expectedToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost && r.Method != http.MethodGet {
@@ -120,10 +131,13 @@ func alertHandler(expectedToken string) http.HandlerFunc {
 			http.Error(w, "Failed to trigger call", http.StatusInternalServerError)
 			return
 		}
-		fmt.Fprintln(w, "Alert triggered successfully")
+		_, _ = fmt.Fprintln(w, "Alert triggered successfully")
 	}
 }
 
+// triggerTwilioCall initiates phone calls to multiple numbers concurrently using Twilio API.
+// It reads credentials from environment variables and calls all numbers in ALERT_TO_NUMBER
+// (comma-separated). Returns an error if any calls fail.
 func triggerTwilioCall(r *http.Request) error {
 	accountSid, apiKeySid, apiKeySecret := os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_API_KEY_SID"), os.Getenv("TWILIO_API_KEY_SECRET")
 	fromNumber, toNumbers := os.Getenv("TWILIO_FROM_NUMBER"), os.Getenv("ALERT_TO_NUMBER")
@@ -166,6 +180,8 @@ func triggerTwilioCall(r *http.Request) error {
 	return nil
 }
 
+// makeCall executes a single Twilio API call to initiate a phone call with a voice message.
+// Uses Twilio API key authentication and inline TwiML for the alert message.
 func makeCall(accountSid, apiKeySid, apiKeySecret, fromNumber, toNumber string) error {
 	data := url.Values{}
 	data.Set("To", toNumber)
@@ -183,7 +199,7 @@ func makeCall(accountSid, apiKeySid, apiKeySecret, fromNumber, toNumber string) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("twilio API error: %d - %s", resp.StatusCode, string(body))
@@ -191,11 +207,13 @@ func makeCall(accountSid, apiKeySid, apiKeySecret, fromNumber, toNumber string) 
 	return nil
 }
 
+// healthHandler responds with "OK" for health check requests at /health.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "OK")
+	_, _ = fmt.Fprintln(w, "OK")
 }
 
+// twimlHandler returns TwiML XML response for Twilio webhook callbacks at /twiml.
 func twimlHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml")
-	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Alert triggered</Say></Response>`)
+	_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Alert triggered</Say></Response>`)
 }
