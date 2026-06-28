@@ -5,6 +5,7 @@ on:
 
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  FLY_APP_NAME: ${{ vars.FLY_APP_NAME }}
 
 jobs:
   deploy:
@@ -13,14 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Verify app name is set
+        run: |
+          if [ -z "$FLY_APP_NAME" ]; then
+            echo "::error::FLY_APP_NAME repository variable is not set"
+            exit 1
+          fi
+
       - name: Set up Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app if it doesn't exist
         run: |
-          if ! flyctl status --app alerts-api 2>/dev/null; then
+          if ! flyctl status --app "$FLY_APP_NAME" 2>/dev/null; then
             echo "Creating app..."
-            flyctl apps create alerts-api
+            flyctl apps create "$FLY_APP_NAME"
           else
             echo "App already exists"
           fi
@@ -30,6 +38,7 @@ jobs:
       - name: Set Fly.io secrets
         run: |
           flyctl secrets set \
+            --app "$FLY_APP_NAME" \
             TOKEN="${{ secrets.TOKEN }}" \
             TWILIO_ACCOUNT_SID="${{ secrets.TWILIO_ACCOUNT_SID }}" \
             TWILIO_API_KEY_SID="${{ secrets.TWILIO_API_KEY_SID }}" \
@@ -40,6 +49,6 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --remote-only --app "$FLY_APP_NAME"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
